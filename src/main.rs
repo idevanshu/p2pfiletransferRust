@@ -82,8 +82,10 @@ async fn send_file(file_path: &str) -> Result<(), Box<dyn Error>> {
 }
 
 async fn receive_file(address: &str) -> Result<(), Box<dyn Error>> {
+    // Ensure the address is in the format "host:port" (without any protocol prefix)
+    let address = address.strip_prefix("tcp://").unwrap_or(address);
     let mut stream = TcpStream::connect(address).await?;
-    let mut buf = vec![0; 4096];  // Larger buffer size
+    let mut buf = vec![0; 4096];
     let mut file_name_buf = Vec::new();
 
     // Read the filename

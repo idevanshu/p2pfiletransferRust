@@ -23,12 +23,16 @@
   </ol>
 
   <h3>Example Usage</h3>
-  <strong>The application can be used to send or receive files. Use the following command line arguments:</strong>
-  <strong>Sending a file:</strong>
-  <pre><code>cargo run -- --mode send --file /path/to/file.txt
-  </code></pre>
-  <strong>Receiving a file:</strong>
-  <pre><code>cargo run -- --mode receive --address 0.0.0.0:8000
-  </code></pre>
+<strong>Sending a file:</strong>
+<pre><code>cargo run -- --mode send --file /path/to/file.txt
+</code></pre>
+<pre><code>ngrok tcp 8000
+</code></pre>
+<strong>Receiving a file:</strong>
+<pre><code>cargo run -- --mode receive --address 0.tcp.ngrok.io:18944
+</code></pre>
+
+<em>Note:</em> Replace `0.tcp.ngrok.io:18944` with the actual Ngrok address and port shown in the Ngrok output.
+
 
    

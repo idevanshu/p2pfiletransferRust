@@ -7,12 +7,14 @@
   <strong>The application can operate in two modes: `send` and `receive`.</strong>
 
   <h3>Prerequisites</h3>
-  <strong>Before you start, ensure you have the following installed:</strong>
-  <ul>
-      <li><strong>Rust programming language (version 1.65 or higher)</strong></li>
-      <li><strong>tokio library (async runtime for Rust)</strong></li>
-      <li><strong>clap library (for command-line argument parsing)</strong></li>
-  </ul>
+<strong>Before you start, ensure you have the following installed:</strong>
+<ul>
+    <li><strong>Rust programming language (version 1.65 or higher)</strong></li>
+    <li><strong>tokio library (async runtime for Rust)</strong></li>
+    <li><strong>clap library (for command-line argument parsing)</strong></li>
+    <li><strong>Ngrok (for exposing local servers to the internet)</strong></li>
+</ul>
+
 
   <h3>Setup</h3>
   <strong>To set up the project, follow these steps:</strong>

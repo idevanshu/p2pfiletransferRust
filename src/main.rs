@@ -2,6 +2,11 @@ use clap::{Arg, Command};
 use std::error::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Semaphore;
+use std::sync::Arc;
+
+const MAX_CONNECTIONS: usize = 32;
+const BUFFER_SIZE: usize = 8192; // Increased buffer size
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -49,43 +54,49 @@ async fn send_file(file_path: &str) -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
     println!("Listening on 0.0.0.0:8000");
 
+    // Semaphore to limit the number of concurrent connections
+    let semaphore = Arc::new(Semaphore::new(MAX_CONNECTIONS));
+
     loop {
-        let (mut socket, _) = listener.accept().await?;
+        let (socket, _) = listener.accept().await?;
+        let semaphore = semaphore.clone();
         let file_path = file_path.to_string();
         let file_name = file_name.clone();
 
         tokio::spawn(async move {
-            let mut file = tokio::fs::File::open(file_path).await.unwrap();
-            let mut buf = vec![0; 4096];  // Larger buffer size
-            let mut file_name_bytes = file_name.as_bytes().to_vec();
-            file_name_bytes.push(b'\n');
-
-            // Send file name
-            if let Err(e) = socket.write_all(&file_name_bytes).await {
-                eprintln!("Failed to send file name: {}", e);
-                return;
-            }
-
-            // Send file data
-            loop {
-                let n = file.read(&mut buf).await.unwrap();
-                if n == 0 {
-                    break;
-                }
-                if let Err(e) = socket.write_all(&buf[..n]).await {
-                    eprintln!("Failed to send file data: {}", e);
-                    break;
-                }
+            let _permit = semaphore.acquire().await.unwrap();
+            if let Err(e) = handle_connection(socket, file_path, file_name).await {
+                eprintln!("Connection handling failed: {}", e);
             }
         });
     }
 }
 
+async fn handle_connection(mut socket: TcpStream, file_path: String, file_name: String) -> Result<(), Box<dyn Error>> {
+    let mut file = tokio::fs::File::open(file_path).await?;
+    let mut buf = vec![0; BUFFER_SIZE];
+    let mut file_name_bytes = file_name.as_bytes().to_vec();
+    file_name_bytes.push(b'\n');
+
+    // Send file name
+    socket.write_all(&file_name_bytes).await?;
+
+    // Send file data
+    loop {
+        let n = file.read(&mut buf).await?;
+        if n == 0 {
+            break;
+        }
+        socket.write_all(&buf[..n]).await?;
+    }
+
+    Ok(())
+}
+
 async fn receive_file(address: &str) -> Result<(), Box<dyn Error>> {
-    // Ensure the address is in the format "host:port" (without any protocol prefix)
     let address = address.strip_prefix("tcp://").unwrap_or(address);
     let mut stream = TcpStream::connect(address).await?;
-    let mut buf = vec![0; 4096];
+    let mut buf = vec![0; BUFFER_SIZE];
     let mut file_name_buf = Vec::new();
 
     // Read the filename
@@ -114,10 +125,7 @@ async fn receive_file(address: &str) -> Result<(), Box<dyn Error>> {
             println!("File reception completed.");
             break;
         }
-        if let Err(e) = file.write_all(&buf[..n]).await {
-            eprintln!("Failed to write data: {}", e);
-            break;
-        }
+        file.write_all(&buf[..n]).await?;
     }
 
     Ok(())

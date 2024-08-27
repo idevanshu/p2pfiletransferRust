@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.39.3", features = ["full"] }
 clap = { version = "4.5.16", features = ["derive"] }
+indicatif = "0.17.8"

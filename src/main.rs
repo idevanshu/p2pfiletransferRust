@@ -7,13 +7,13 @@ use tokio::sync::Semaphore;
 use indicatif::{ProgressBar, ProgressStyle};
 
 const MAX_CONNECTIONS: usize = 32;
-const BUFFER_SIZE: usize = 8192;
+const BUFFER_SIZE: usize = 64 * 1024; // 64 KB buffer size
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let matches = Command::new("File Transfer")
         .version("1.0")
-        .author("Your Name")
+        .author("github.com/idevanshu")
         .about("Send and receive files using TCP")
         .arg(
             Arg::new("mode")
@@ -123,7 +123,7 @@ async fn receive_file(address: &str) -> Result<(), Box<dyn Error>> {
     let progress_bar = ProgressBar::new(100); // Placeholder value for total size
     progress_bar.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes} ({eta})")
             .unwrap()
             .progress_chars("#>-"),
     );

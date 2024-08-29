@@ -62,6 +62,7 @@ async fn send_file(file_path: &str) -> Result<(), Box<dyn Error>> {
     println!("Listening on 0.0.0.0:8000");
 
     let semaphore = Arc::new(Semaphore::new(MAX_CONNECTIONS));
+    let mut active_connections = 0;
 
     while let Ok((socket, _)) = listener.accept().await {
         let semaphore = semaphore.clone();
@@ -70,9 +71,15 @@ async fn send_file(file_path: &str) -> Result<(), Box<dyn Error>> {
 
         tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
+            active_connections += 1;
+            println!("Active connections: {}", active_connections);
+
             if let Err(e) = handle_connection(socket, file_path, file_name).await {
                 eprintln!("Connection handling failed: {}", e);
             }
+
+            active_connections -= 1;
+            println!("Active connections: {}", active_connections);
         });
     }
 
@@ -80,12 +87,14 @@ async fn send_file(file_path: &str) -> Result<(), Box<dyn Error>> {
 }
 
 async fn handle_connection(mut socket: TcpStream, file_path: String, file_name: String) -> Result<(), Box<dyn Error>> {
-    let mut file = tokio::fs::File::open(file_path).await?;
+    let mut file = tokio::fs::File::open(&file_path).await?;
+    let file_size = file.metadata().await?.len();
     let mut buf = vec![0; BUFFER_SIZE];
     let file_name_bytes = file_name.as_bytes();
 
+    socket.write_all(&file_size.to_le_bytes()).await?;
     socket.write_all(file_name_bytes).await?;
-    socket.write_all(&[b'\n']).await?; // Send newline after file name
+    socket.write_all(&[b'\n']).await?;
 
     while let Ok(n) = file.read(&mut buf).await {
         if n == 0 {
@@ -102,6 +111,9 @@ async fn receive_file(address: &str) -> Result<(), Box<dyn Error>> {
     let mut stream = TcpStream::connect(address).await?;
     let mut buf = vec![0; BUFFER_SIZE];
     let mut file_name_buf = Vec::new();
+
+    stream.read_exact(&mut buf[..8]).await?;
+    let file_size = u64::from_le_bytes(buf[..8].try_into().unwrap());
 
     while let Ok(n) = stream.read(&mut buf).await {
         if n == 0 {
@@ -120,10 +132,10 @@ async fn receive_file(address: &str) -> Result<(), Box<dyn Error>> {
 
     println!("Receiving file as: {}", file_name);
 
-    let progress_bar = ProgressBar::new(100); // Placeholder value for total size
+    let progress_bar = ProgressBar::new(file_size);
     progress_bar.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes} ({eta})")
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
             .unwrap()
             .progress_chars("#>-"),
     );

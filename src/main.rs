@@ -5,12 +5,26 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Semaphore;
 use indicatif::{ProgressBar, ProgressStyle};
+use num_cpus;
 
-const MAX_CONNECTIONS: usize = 32;
 const BUFFER_SIZE: usize = 64 * 1024; // 64 KB buffer size
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
+    // Determine the number of CPU cores
+    let num_threads = num_cpus::get();
+
+    // Build the Tokio runtime with the desired number of threads
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(num_threads)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    // Run the async main function within the Tokio runtime
+    runtime.block_on(async_main())
+}
+
+async fn async_main() -> Result<(), Box<dyn Error>> {
     let matches = Command::new("File Transfer")
         .version("1.0")
         .author("github.com/idevanshu")
@@ -61,7 +75,7 @@ async fn send_file(file_path: &str) -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
     println!("Listening on 0.0.0.0:8000");
 
-    let semaphore = Arc::new(Semaphore::new(MAX_CONNECTIONS));
+    let semaphore = Arc::new(Semaphore::new(num_cpus::get())); // Use dynamic thread count
     let mut active_connections = 0;
 
     while let Ok((socket, _)) = listener.accept().await {

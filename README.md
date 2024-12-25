@@ -33,7 +33,7 @@
 
 <h3>With Port Forwarding on Port 8000</h3>
 <strong>To Send a File:</strong>
-<pre><code>cargo run -- --mode send --file /path/to/file.txt
+<pre><code>cargo run -- --mode send --file "/path/to/file.txt"
 </code></pre>
 <pre><code>ngrok tcp 8000
 </code></pre>

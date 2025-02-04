@@ -33,7 +33,7 @@
 
 <h3>With Port Forwarding on Port 8000</h3>
 <strong>To Send a File or Folder:</strong>
-<pre><code>cargo run -- --mode send --f "/path/to/file_or_folder"
+<pre><code>cargo run -- --mode send -f "/path/to/file_or_folder"
 </code></pre>
 <pre><code>ngrok tcp 8000
 </code></pre>
@@ -44,7 +44,7 @@
 
 <h3>With Ngrok</h3>
 <strong>To Send a File or Folder:</strong>
-<pre><code>cargo run -- --mode send --f "/path/to/file_or_folder"
+<pre><code>cargo run -- --mode send -f "/path/to/file_or_folder"
 </code></pre>
 <pre><code>ngrok tcp 8000
 </code></pre>

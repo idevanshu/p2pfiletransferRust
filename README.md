@@ -32,24 +32,24 @@
 <h3>Example Usage</h3>
 
 <h3>With Port Forwarding on Port 8000</h3>
-<strong>To Send a File:</strong>
-<pre><code>cargo run -- --mode send --file "/path/to/file.txt"
+<strong>To Send a File or Folder:</strong>
+<pre><code>cargo run -- --mode send --f "/path/to/file_or_folder"
 </code></pre>
 <pre><code>ngrok tcp 8000
 </code></pre>
 
-<strong>To Receive a File:</strong>
+<strong>To Receive a File or Folder:</strong>
 <pre><code>cargo run -- --mode receive --address Your_Sender_Ip_Address:8000
 </code></pre>
 
 <h3>With Ngrok</h3>
-<strong>To Send a File:</strong>
-<pre><code>cargo run -- --mode send --file "/path/to/file.txt"
+<strong>To Send a File or Folder:</strong>
+<pre><code>cargo run -- --mode send --f "/path/to/file_or_folder"
 </code></pre>
 <pre><code>ngrok tcp 8000
 </code></pre>
 
-<strong>To Receive a File:</strong>
+<strong>To Receive a File or Folder:</strong>
 <pre><code>cargo run -- --mode receive --address 0.tcp.ngrok.io:18944
 </code></pre>
 

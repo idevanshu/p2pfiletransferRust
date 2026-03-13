@@ -34,12 +34,36 @@ Sender                          Receiver
 
 ## Prerequisites
 
-- [Rust](https://rustup.rs/) 1.75+
-- That's it. All dependencies are pulled via Cargo.
+- [Rust](https://rustup.rs/) 1.75+ (the setup script installs it for you)
+- **Linux**: gcc, pkg-config, openssl headers (setup script handles this)
+- **macOS**: Xcode Command Line Tools
+- **Windows**: Visual Studio Build Tools (C++ workload)
 
 ---
 
 ## Install
+
+### One-command setup (recommended)
+
+The setup script detects your OS, installs Rust if missing, installs system dependencies, builds the release binary, and optionally adds it to your PATH.
+
+**Linux / macOS / WSL:**
+
+```bash
+git clone https://github.com/idevanshu/p2pfiletransferRust.git
+cd p2pfiletransferRust
+./setup.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/idevanshu/p2pfiletransferRust.git
+cd p2pfiletransferRust
+.\setup.ps1
+```
+
+### Manual install
 
 ```bash
 git clone https://github.com/idevanshu/p2pfiletransferRust.git
@@ -53,7 +77,51 @@ The binary is at `target/release/p2pfiletransfer` (~6 MB, stripped).
 
 ## Quick Start
 
-### Send a file
+### Using the launcher script (easiest)
+
+The launcher script provides both a direct CLI and an interactive menu.
+
+**Interactive mode** — just run with no arguments:
+
+```bash
+./start.sh           # Linux / macOS
+.\start.ps1          # Windows
+```
+
+```
+═══════════════════════════════════════
+  p2pfiletransfer
+═══════════════════════════════════════
+
+  1) Send a file or folder
+  2) Receive a file or folder
+  3) Show help
+  4) Exit
+
+choose [1-4]:
+```
+
+It walks you through picking a file, entering the sender address, and optionally configuring a relay.
+
+**Direct mode** — pass arguments directly:
+
+```bash
+# Send
+./start.sh send ./photo.jpg
+./start.sh send ./my-folder --relay /ip4/RELAY_IP/tcp/4001/p2p/RELAY_ID
+
+# Receive
+./start.sh receive /ip4/192.168.1.5/tcp/43210/p2p/12D3KooW...
+./start.sh recv /ip4/.../p2p/... --relay /ip4/RELAY_IP/tcp/4001/p2p/RELAY_ID
+
+# Windows
+.\start.ps1 send .\photo.jpg
+.\start.ps1 receive /ip4/.../p2p/...
+```
+
+### Using the binary directly
+
+#### Send a file
 
 ```bash
 # Sender machine

@@ -1,8 +1,8 @@
-# Pushpak
+# P2P File Transfer
 
 Peer-to-peer file transfer built in Rust. Send files and folders directly between machines — **no port forwarding, no cloud, no accounts**.
 
-Powered by [libp2p](https://libp2p.io/), pushpak handles NAT traversal automatically using hole punching (DCUtR) and relay fallback, so it works across the internet even when both peers are behind routers.
+Powered by [libp2p](https://libp2p.io/), p2pfiletransfer handles NAT traversal automatically using hole punching (DCUtR) and relay fallback, so it works across the internet even when both peers are behind routers.
 
 ```
 Sender                          Receiver
@@ -47,7 +47,7 @@ cd p2pfiletransferRust
 cargo build --release
 ```
 
-The binary is at `target/release/pushpak` (~6 MB, stripped).
+The binary is at `target/release/p2pfiletransfer` (~6 MB, stripped).
 
 ---
 
@@ -57,14 +57,14 @@ The binary is at `target/release/pushpak` (~6 MB, stripped).
 
 ```bash
 # Sender machine
-pushpak -m send -f photo.jpg
+p2pfiletransfer -m send -f photo.jpg
 ```
 
 Output:
 
 ```
 ──────────────────────────────────
-  pushpak sender
+  p2pfiletransfer sender
   peer: 12D3KooWAbCdEf...
 ──────────────────────────────────
 [listen] /ip4/192.168.1.5/tcp/43210/p2p/12D3KooWAbCdEf...
@@ -76,7 +76,7 @@ Copy the full `/ip4/.../p2p/...` address and give it to the receiver.
 
 ```bash
 # Receiver machine
-pushpak -m receive -a /ip4/192.168.1.5/tcp/43210/p2p/12D3KooWAbCdEf...
+p2pfiletransfer -m receive -a /ip4/192.168.1.5/tcp/43210/p2p/12D3KooWAbCdEf...
 ```
 
 The file is saved to the `received/` directory.
@@ -84,7 +84,7 @@ The file is saved to the `received/` directory.
 ### Send a folder
 
 ```bash
-pushpak -m send -f ./my-project/
+p2pfiletransfer -m send -f ./my-project/
 ```
 
 The entire directory tree is transferred recursively.
@@ -93,7 +93,7 @@ The entire directory tree is transferred recursively.
 
 ## NAT Traversal
 
-This is the main reason pushpak uses libp2p. When both peers are behind NAT (home routers, CGNAT), direct connections normally fail. Pushpak solves this automatically:
+This is the main reason p2pfiletransfer uses libp2p. When both peers are behind NAT (home routers, CGNAT), direct connections normally fail. p2pfiletransfer solves this automatically:
 
 ### How it works
 
@@ -125,7 +125,7 @@ You need a libp2p relay server. You can run one yourself using the [rust-libp2p 
 **Sender (behind NAT):**
 
 ```bash
-pushpak -m send -f data.zip -r /ip4/RELAY_IP/tcp/4001/p2p/RELAY_PEER_ID
+p2pfiletransfer -m send -f data.zip -r /ip4/RELAY_IP/tcp/4001/p2p/RELAY_PEER_ID
 ```
 
 The sender will print a circuit address like:
@@ -137,21 +137,21 @@ The sender will print a circuit address like:
 **Receiver (behind NAT):**
 
 ```bash
-pushpak -m receive \
+p2pfiletransfer -m receive \
   -a /ip4/RELAY_IP/tcp/4001/p2p/RELAY_PEER_ID/p2p-circuit/p2p/SENDER_PEER_ID \
   -r /ip4/RELAY_IP/tcp/4001/p2p/RELAY_PEER_ID
 ```
 
 ### LAN (no relay needed)
 
-On the same local network, pushpak uses mDNS to discover peers automatically. Just use the direct address printed by the sender — no relay flag needed.
+On the same local network, p2pfiletransfer uses mDNS to discover peers automatically. Just use the direct address printed by the sender — no relay flag needed.
 
 ---
 
 ## CLI Reference
 
 ```
-pushpak [OPTIONS] --mode <mode>
+p2pfiletransfer [OPTIONS] --mode <mode>
 
 Options:
   -m, --mode <mode>        send or receive
@@ -165,7 +165,7 @@ Options:
 
 ### Address format
 
-Pushpak uses [multiaddr](https://multiformats.io/multiaddr/) format:
+p2pfiletransfer uses [multiaddr](https://multiformats.io/multiaddr/) format:
 
 | Scenario | Address format |
 |---|---|
@@ -183,7 +183,7 @@ Pushpak uses [multiaddr](https://multiformats.io/multiaddr/) format:
 
 ## Wire Protocol
 
-Pushpak uses a custom binary protocol (`/pushpak/transfer/1`) over libp2p streams.
+p2pfiletransfer uses a custom binary protocol (`/p2pfiletransfer/transfer/1`) over libp2p streams.
 
 ### Single file
 
@@ -327,7 +327,7 @@ codegen-units = 1
 ### Debug logging
 
 ```bash
-RUST_LOG=debug pushpak -m send -f file.txt
+RUST_LOG=debug p2pfiletransfer -m send -f file.txt
 ```
 
 This shows all libp2p events including mDNS, relay, DCUtR negotiations.

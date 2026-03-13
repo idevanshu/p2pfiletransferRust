@@ -19,7 +19,7 @@ const MAX_NAME: usize = 240;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 const STREAM_TIMEOUT: Duration = Duration::from_secs(10);
-const PROTOCOL: StreamProtocol = StreamProtocol::new("/pushpak/transfer/1");
+const PROTOCOL: StreamProtocol = StreamProtocol::new("/p2pfiletransfer/transfer/1");
 
 type Res<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -41,7 +41,7 @@ async fn main() -> Res {
         .compact()
         .init();
 
-    let m = Command::new("pushpak")
+    let m = Command::new("p2pfiletransfer")
         .version("5.0")
         .author("github.com/idevanshu")
         .about("P2P file transfer with NAT traversal")
@@ -76,7 +76,7 @@ fn build_swarm() -> Res<(libp2p::Swarm<Behaviour>, stream_proto::Control)> {
                 relay: relay_client,
                 dcutr: dcutr::Behaviour::new(pid),
                 identify: identify::Behaviour::new(
-                    identify::Config::new("/pushpak/1".into(), kp.public()),
+                    identify::Config::new("/p2pfiletransfer/1".into(), kp.public()),
                 ),
                 mdns: mdns::tokio::Behaviour::new(mdns::Config::default(), pid)?,
                 stream: stream_proto::Behaviour::new(),
@@ -134,7 +134,7 @@ async fn send(path: &str, relay: Option<String>, port: u16) -> Res {
     let mut relay_listened = false;
 
     eprintln!("──────────────────────────────────");
-    eprintln!("  pushpak sender");
+    eprintln!("  p2pfiletransfer sender");
     eprintln!("  peer: {pid}");
     eprintln!("──────────────────────────────────");
 

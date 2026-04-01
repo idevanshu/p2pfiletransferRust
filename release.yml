@@ -1,0 +1,52 @@
+# .github/workflows/release.yml
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # This triggers on version tags, e.g., v3.1.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build Project
+        run: cargo build --release
+
+      - name: Prepare Release Artifacts
+        run: |
+          mkdir release-artifacts
+          cp target/release/fast-file-transfer release-artifacts/
+          cd release-artifacts
+          zip -r fast-file-transfer.zip .
+          # Move back to the root so the asset can be found.
+          cd ..
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref }}
+          body: "Release of version ${{ github.ref }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset - Zip File
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          asset_path: release-artifacts/fast-file-transfer.zip
+          asset_name: fast-file-transfer.zip
+          asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

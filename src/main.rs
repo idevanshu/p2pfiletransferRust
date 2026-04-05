@@ -16,10 +16,12 @@ use tokio::net::{TcpListener, TcpStream};
 
 // ── Performance tuning (100 Gbps target) ───────────────────────
 const IO_BUF: usize = 32 * 1024 * 1024; // 32 MB I/O chunks
-const TCP_BUF: usize = 128 * 1024 * 1024; // 128 MB socket bufs
+const TCP_BUF: usize = 8 * 1024 * 1024; // 8 MB socket bufs (Windows-friendly)
 const MAX_COMP_LEN: usize = 240;
 const KEEPALIVE: Duration = Duration::from_secs(60);
-const DEFAULT_STREAMS: usize = 32;
+const DEFAULT_STREAMS: usize = 8;
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const ACCEPT_TIMEOUT: Duration = Duration::from_secs(30);
 
 type Res = Result<(), Box<dyn Error + Send + Sync>>;
 
@@ -87,7 +89,18 @@ async fn async_main() -> Res {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async fn send(path: &str, num_streams: usize) -> Res {
-    let lis = TcpListener::bind("0.0.0.0:8000").await?;
+    // Validate path before binding
+    let p = Path::new(path);
+    if !p.exists() {
+        return Err(format!("path does not exist: {path}").into());
+    }
+    if !p.is_file() && !p.is_dir() {
+        return Err(format!("not a file or directory: {path}").into());
+    }
+
+    let lis = TcpListener::bind("0.0.0.0:8000").await.map_err(|e| {
+        format!("failed to bind on port 8000 (is another instance running?): {e}")
+    })?;
     println!(
         "Listening on {} ({num_streams} data streams)",
         lis.local_addr()?
@@ -97,18 +110,29 @@ async fn send(path: &str, num_streams: usize) -> Res {
         // 1 ─ accept control connection
         let (ctrl, addr) = lis.accept().await?;
         println!("\nReceiver connected: {addr}");
-        let ctrl = setup(ctrl)?;
+        let ctrl = setup(ctrl).map_err(|e| format!("control socket setup failed: {e}"))?;
         let mut ctrl = BufWriter::with_capacity(IO_BUF, ctrl);
 
         // 2 ─ handshake: tell receiver how many data streams to open
         ctrl.write_all(&(num_streams as u32).to_le_bytes()).await?;
         ctrl.flush().await?;
 
-        // 3 ─ accept N data streams
+        // 3 ─ accept N data streams (with timeout)
         let mut data = Vec::with_capacity(num_streams);
-        for _ in 0..num_streams {
-            let (s, _) = lis.accept().await?;
-            data.push(setup(s)?);
+        for i in 0..num_streams {
+            let accept_fut = lis.accept();
+            let (s, _) = tokio::time::timeout(ACCEPT_TIMEOUT, accept_fut)
+                .await
+                .map_err(|_| {
+                    format!(
+                        "timed out waiting for data stream {}/{num_streams} ({}s)",
+                        i + 1,
+                        ACCEPT_TIMEOUT.as_secs()
+                    )
+                })??;
+            data.push(
+                setup(s).map_err(|e| format!("data stream {} setup failed: {e}", i + 1))?,
+            );
         }
         println!("{num_streams} data streams established");
 
@@ -256,19 +280,49 @@ async fn send_folder_striped(streams: Vec<TcpStream>, manifest: &[(PathBuf, Stri
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async fn receive(address: &str) -> Res {
-    // 1 ─ control connection
-    let ctrl = TcpStream::connect(address).await?;
-    let ctrl = setup(ctrl)?;
+    // 1 ─ control connection (with timeout)
+    println!("Connecting to {address}...");
+    let ctrl = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(address))
+        .await
+        .map_err(|_| {
+            format!(
+                "connection timed out after {}s — is the sender running at {address}?",
+                CONNECT_TIMEOUT.as_secs()
+            )
+        })?
+        .map_err(|e| format!("failed to connect to {address}: {e}"))?;
+    let ctrl =
+        setup(ctrl).map_err(|e| format!("control socket setup failed: {e}"))?;
     let mut ctrl = BufReader::with_capacity(IO_BUF, ctrl);
 
     let num_streams = read_u32(&mut ctrl).await? as usize;
-
-    // 2 ─ open data streams right away so the sender can proceed
-    let mut data = Vec::with_capacity(num_streams);
-    for _ in 0..num_streams {
-        let s = TcpStream::connect(address).await?;
-        data.push(setup(s)?);
+    if num_streams == 0 || num_streams > 256 {
+        return Err(format!("invalid stream count from sender: {num_streams}").into());
     }
+
+    // 2 ─ open data streams in parallel (much faster than sequential)
+    let addr = address.to_string();
+    let mut futs = Vec::with_capacity(num_streams);
+    for i in 0..num_streams {
+        let addr = addr.clone();
+        futs.push(async move {
+            let s = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(&addr))
+                .await
+                .map_err(|_| {
+                    format!(
+                        "data stream {}/{num_streams} timed out connecting to {addr}",
+                        i + 1
+                    )
+                })?
+                .map_err(|e| format!("data stream {}/{num_streams} failed: {e}", i + 1, ))?;
+            setup(s).map_err(|e| {
+                format!("data stream {}/{num_streams} setup failed: {e}", i + 1)
+            })
+        });
+    }
+    let data: Result<Vec<TcpStream>, String> =
+        futures::future::join_all(futs).await.into_iter().collect();
+    let data = data.map_err(|e| -> Box<dyn Error + Send + Sync> { e.into() })?;
     println!("Connected to {address} ({num_streams} streams)");
 
     // 3 ─ read mode + manifest (sender writes these after data streams connect)
@@ -479,9 +533,10 @@ fn setup(sock: TcpStream) -> io::Result<TcpStream> {
     let std: StdTcpStream = sock.into_std()?;
     std.set_nodelay(true)?;
     let s = Socket::from(std);
-    s.set_send_buffer_size(TCP_BUF)?;
-    s.set_recv_buffer_size(TCP_BUF)?;
-    s.set_tcp_keepalive(&TcpKeepalive::new().with_time(KEEPALIVE))?;
+    // Best-effort buffer sizing — Windows may reject large values
+    let _ = s.set_send_buffer_size(TCP_BUF);
+    let _ = s.set_recv_buffer_size(TCP_BUF);
+    let _ = s.set_tcp_keepalive(&TcpKeepalive::new().with_time(KEEPALIVE));
     TcpStream::from_std(s.into())
 }
 
